@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GiftRarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+enum InventoryStatus {
+  OWNED
+  LISTED
+  TRANSFERRED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  FAILED
+}
+
+enum BalanceTransactionType {
+  DEPOSIT
+  PURCHASE
+  REFUND
+  BONUS
+}
+
+enum BalanceTransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum GiftSource {
+  TELEGRAM
+  INTERNAL
+}
+
+enum StarsPaymentStatus {
+  PENDING
+  PRECHECKOUT_APPROVED
+  PAID
+  FAILED
+}
+
+model User {
+  id             String          @id @default(uuid()) @db.Uuid
+  telegramId     BigInt          @unique
+  username       String?
+  firstName      String
+  lastName       String?
+  avatarUrl      String?
+  balance        Decimal         @default(0) @db.Decimal(20, 9)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  inventoryItems InventoryItem[]
+  orders         Order[]
+  balanceTransactions BalanceTransaction[]
+  starsPayments  StarsPayment[]
+}
+
+model Category {
+  id        String   @id @default(uuid()) @db.Uuid
+  slug      String   @unique
+  name      String
+  artwork   String
+  accent    String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  gifts     Gift[]
+}
+
+model Gift {
+  id             String          @id @default(uuid()) @db.Uuid
+  slug           String          @unique
+  name           String
+  imageUrl       String
+  artwork        String          @default("🎁")
+  description    String
+  rarity         GiftRarity
+  price          Decimal         @db.Decimal(20, 9)
+  supply         Int
+  available      Int
+  categoryId     String          @db.Uuid
+  featured       Boolean         @default(false)
+  popularity     Int             @default(0)
+  source         GiftSource      @default(INTERNAL)
+  telegramGiftId String?         @unique
+  telegramStarCount Int?
+  telegramUpgradeStarCount Int?
+  telegramFileId String?
+  telegramFileUniqueId String?
+  telegramIsPremium Boolean      @default(false)
+  telegramRaw    Json?
+  telegramSyncedAt DateTime?
+  createdAt      DateTime        @default(now())
+  category       Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  inventoryItems InventoryItem[]
+  orders         Order[]
+  banners        Banner[]
+
+  @@index([rarity])
+  @@index([categoryId])
+  @@index([source, available])
+  @@index([featured, popularity])
+  @@index([createdAt])
+}
+
+model Banner {
+  id           String   @id @default(uuid()) @db.Uuid
+  slug         String   @unique
+  label        String
+  title        String
+  subtitle     String?
+  imageUrl     String
+  artwork      String
+  style        String
+  gradientFrom String
+  gradientTo   String
+  targetPath   String
+  sortOrder    Int      @default(0)
+  active       Boolean  @default(true)
+  giftId       String?  @db.Uuid
+  createdAt    DateTime @default(now())
+  gift         Gift?    @relation(fields: [giftId], references: [id], onDelete: SetNull)
+
+  @@index([active, sortOrder])
+  @@index([giftId])
+}
+
+model InventoryItem {
+  id             String          @id @default(uuid()) @db.Uuid
+  userId         String          @db.Uuid
+  giftId         String          @db.Uuid
+  status         InventoryStatus @default(OWNED)
+  purchasedPrice Decimal         @db.Decimal(20, 9)
+  orderId         String?         @unique @db.Uuid
+  source          GiftSource      @default(INTERNAL)
+  createdAt      DateTime        @default(now())
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gift           Gift            @relation(fields: [giftId], references: [id], onDelete: Restrict)
+  order          Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([giftId])
+}
+
+model Order {
+  id        String      @id @default(uuid()) @db.Uuid
+  userId    String      @db.Uuid
+  giftId    String      @db.Uuid
+  amount    Decimal     @db.Decimal(20, 9)
+  status    OrderStatus @default(PENDING)
+  source    GiftSource  @default(INTERNAL)
+  createdAt DateTime    @default(now())
+  user      User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  gift      Gift        @relation(fields: [giftId], references: [id], onDelete: Restrict)
+  inventoryItem      InventoryItem?
+  balanceTransaction BalanceTransaction?
+
+  @@index([userId, createdAt])
+  @@index([giftId])
+}
+
+model BalanceTransaction {
+  id        String                   @id @default(uuid()) @db.Uuid
+  userId    String                   @db.Uuid
+  orderId   String?                  @unique @db.Uuid
+  type      BalanceTransactionType
+  amount    Decimal                  @db.Decimal(20, 9)
+  status    BalanceTransactionStatus @default(COMPLETED)
+  createdAt DateTime                 @default(now())
+  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order     Order?                   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  starsPayment StarsPayment?
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model StarsPayment {
+  id                        String             @id @default(uuid()) @db.Uuid
+  userId                    String             @db.Uuid
+  balanceTransactionId      String?            @unique @db.Uuid
+  invoicePayload            String             @unique
+  starCount                 Int
+  status                    StarsPaymentStatus @default(PENDING)
+  telegramPaymentChargeId   String?            @unique
+  providerPaymentChargeId   String?
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+  paidAt                    DateTime?
+  user                      User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  balanceTransaction        BalanceTransaction? @relation(fields: [balanceTransactionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status])
+}

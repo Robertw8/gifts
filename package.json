@@ -1,0 +1,20 @@
+{
+  "name": "limited-gifts-marketplace",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.15.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm --parallel --filter @gifts/web --filter @gifts/api dev",
+    "dev:web": "pnpm --filter @gifts/web dev",
+    "dev:api": "pnpm --filter @gifts/api dev",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "db:generate": "pnpm --filter @gifts/api prisma:generate",
+    "db:migrate": "pnpm --filter @gifts/api prisma:migrate",
+    "db:seed": "pnpm --filter @gifts/api prisma:seed"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}
